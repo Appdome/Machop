@@ -1,5 +1,6 @@
 import struct
 
+from constants import *
 from cputype import get_arch_name
 
 
@@ -67,18 +68,29 @@ def load_fat(filename, little_endian=True):
             thins[arch_name] = _MachO(filename, little_endian, arch)
         return thins
 
-PARSERS = {
-        'bebafeca': lambda filename: load_fat(filename, True),  # FAT_CIGAM
-        'cafebabe': lambda filename: load_fat(filename, False),  # FAT_MAGIC
-        'cdfaedfe': lambda filename: load_thin(filename, True),  # MH_CIGAM
-        'feedface': lambda filename: load_thin(filename, False),  # MH_MAGIC
-        }
+
+def load_non_mach(filename):
+    return None
+
+
+def read_magic(filename):
+    with open(filename, 'rb') as f:
+        magic = f.read(4)
+        if len(magic) == 4:
+            return struct.unpack('<I', magic)[0]
+    return None
 
 
 def MachO(filename):
-    with open(filename, 'rb') as f:
-        magic = f.read(4)
-        return PARSERS[magic.encode('hex')](filename)
+    MACH_PARSERS = {
+            FAT_MAGIC: lambda filename: load_fat(filename, True),
+            FAT_CIGAM: lambda filename: load_fat(filename, False),
+            MH_MAGIC: lambda filename: load_thin(filename, True),
+            MH_CIGAM: lambda filename: load_thin(filename, False),
+            MH_MAGIC_64: lambda filename: load_thin(filename, True),
+            MH_CIGAM_64: lambda filename: load_thin(filename, False),
+            }
+    return MACH_PARSERS.get(read_magic(filename), load_non_mach)(filename)
 
 if __name__ == '__main__':
     from sys import argv
