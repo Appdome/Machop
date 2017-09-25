@@ -11,6 +11,7 @@ class LoadCommand(object):
     def __init__(self, macho, offset):
         self.macho = macho
         self.lcmd = macho.unpack(offset, self.CMD)
+        self.offset = offset
 
     def __getattr__(self, attr):
         return self.lcmd.get(attr, None)
@@ -19,24 +20,76 @@ class LoadCommand(object):
         return 'LoadCommand(cmd={}, cmdsize={})'.format(self.cmd, self.cmdsize)
 
 
+class Section(object):
+    def __init__(self, section):
+        self.section = section
+
+    def __getattr__(self, attr):
+        return self.section.get(attr, None)
+
+
 class SegmentCommand(LoadCommand):
+    SECTION_CMD = None
+    def __iter__(self):
+        offset = self.offset
+        for _ in range(self.nsects):
+            yield self.macho.unpack(offset, self.SECTION_COMMAND)
+
     def __str__(self):
         return 'Segment:{}'.format(self.segname.strip('\x00'))
 
 
 class SegmentCommand32(SegmentCommand):
     CMD = segment_command_32
+    SECTION_COMMAND = section_32
 
 
 class SegmentCommand64(SegmentCommand):
     CMD = segment_command_64
+    SECTION_COMMAND = section_64
 
+
+class Symbol(object):
+    def __init__(self, symtab, nlist, idx):
+        self.symtab = symtab
+        self.nlist = nlist
+        self.idx = idx
+    
+    def __str__(self):
+        return self.symtab.extract_name(self.n_strx)
+
+    def __getattr__(self, attr):
+        return self.nlist.get(attr, None)
 
 class SymtabCommand(LoadCommand):
     CMD = symtab_command
+    NLIST = None
+
+    def __iter__(self):
+        offset = self.symoff
+        for idx in range(self.nsyms):
+            nlist = self.macho.unpack(offset, self.NLIST)
+            yield Symbol(self, nlist, idx)
+            offset += sizeof(self.NLIST)
+
+    def extract_name(self, name_offset):
+        chars = []
+        offset = self.stroff + name_offset
+        while self.macho.raw[offset] != '\0':
+            chars.append(self.macho.raw[offset])
+            offset += 1
+        return ''.join(chars)
 
     def __str__(self):
         return 'Symtab(nsyms={})'.format(self.nsyms)
+
+
+class SymtabCommand32(SymtabCommand):
+    NLIST = nlist_32
+
+
+class SymtabCommand64(SymtabCommand):
+    NLIST = nlist_64
 
 
 class _MachO(object):
@@ -83,7 +136,7 @@ class _MachO64(_MachO):
     nlist = nlist_64
     LOAD_COMMAND_CLASSES = {
         LC_SEGMENT_64: SegmentCommand64,
-        LC_SYMTAB: SymtabCommand,
+        LC_SYMTAB: SymtabCommand64,
     }
 
 
@@ -95,7 +148,7 @@ class _MachO32(_MachO):
     nlist = nlist_32
     LOAD_COMMAND_CLASSES = {
         LC_SEGMENT: SegmentCommand32,
-        LC_SYMTAB: SymtabCommand,
+        LC_SYMTAB: SymtabCommand32,
     }
 
 
