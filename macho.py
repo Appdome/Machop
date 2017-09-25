@@ -84,9 +84,9 @@ class _MachO64(_MachO):
     LC_SEGMENT_cmd = LC_SEGMENT_64
     nlist = nlist_64
     LOAD_COMMAND_CLASSES = {
-            LC_SEGMENT_64: SegmentCommand64,
-            LC_SYMTAB: SymtabCommand,
-        }
+        LC_SEGMENT_64: SegmentCommand64,
+        LC_SYMTAB: SymtabCommand,
+    }
 
 
 class _MachO32(_MachO):
@@ -96,9 +96,9 @@ class _MachO32(_MachO):
     LC_SEGMENT_cmd = LC_SEGMENT
     nlist = nlist_32
     LOAD_COMMAND_CLASSES = {
-            LC_SEGMENT: SegmentCommand32,
-            LC_SYMTAB: SymtabCommand,
-        }
+        LC_SEGMENT: SegmentCommand32,
+        LC_SYMTAB: SymtabCommand,
+    }
 
 
 def load_thin_32(filename, little_endian=True):
@@ -151,13 +151,13 @@ def read_magic(filename):
 
 def MachO(filename):
     MACH_PARSERS = {
-            FAT_MAGIC: lambda filename: load_fat(filename, True),
-            FAT_CIGAM: lambda filename: load_fat(filename, False),
-            MH_MAGIC: lambda filename: load_thin_32(filename, True),
-            MH_CIGAM: lambda filename: load_thin_32(filename, False),
-            MH_MAGIC_64: lambda filename: load_thin_64(filename, True),
-            MH_CIGAM_64: lambda filename: load_thin_64(filename, False),
-            }
+        FAT_MAGIC: lambda filename: load_fat(filename, True),
+        FAT_CIGAM: lambda filename: load_fat(filename, False),
+        MH_MAGIC: lambda filename: load_thin_32(filename, True),
+        MH_CIGAM: lambda filename: load_thin_32(filename, False),
+        MH_MAGIC_64: lambda filename: load_thin_64(filename, True),
+        MH_CIGAM_64: lambda filename: load_thin_64(filename, False),
+    }
     return MACH_PARSERS.get(read_magic(filename), load_non_mach)(filename)
 
 if __name__ == '__main__':
