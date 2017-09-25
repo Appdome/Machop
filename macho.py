@@ -5,13 +5,45 @@ from structures import *
 from cputype import get_arch_name
 
 
+class LoadCommand(object):
+    CMD = load_command
+
+    def __init__(self, macho, offset):
+        self.macho = macho
+        self.lcmd = macho.unpack(offset, self.CMD)
+
+    def __getattr__(self, attr):
+        return self.lcmd.get(attr, None)
+
+    def __str__(self):
+        return 'LoadCommand(cmd={}, cmdsize={})'.format(self.cmd, self.cmdsize)
+
+class SegmentCommand(LoadCommand):
+    def __str__(self):
+        return 'Segment:{}'.format(self.segname.strip('\x00'))
+
+
+class SegmentCommand32(SegmentCommand):
+    CMD = segment_command_32
+
+
+class SegmentCommand64(SegmentCommand):
+    CMD = segment_command_64
+
+
+class SymtabCommand(LoadCommand):
+    CMD = symtab_command
+    def __str__(self):
+        return 'Symtab(nsyms={})'.format(self.nsyms)
+
+
 class _MachO(object):
     mach_header = None
     segment_command = None
     section = None
     LC_SEGMENT_cmd = None
     nlist = None
-    LOAD_COMMAND_FORMATS = {}
+    LOAD_COMMAND_CLASSES = {}
 
     def __init__(self, filename, little_endian=True, arch=None):
         self.little_endian = little_endian
@@ -24,7 +56,16 @@ class _MachO(object):
                 macho_file.seek(arch['offset'])
                 self.raw = macho_file.read(arch['size'])
         self.header = self.unpack(0, self.mach_header)
-        print self.header
+        for xxx in self.load_commands():
+            print xxx
+
+    def load_commands(self):
+        offset = sizeof(self.mach_header)
+        for i in range(self.header['ncmds']):
+            cmd = self.unpack(offset, load_command)
+            cmd_class = self.LOAD_COMMAND_CLASSES.get(cmd['cmd'], LoadCommand)
+            yield cmd_class(self, offset)
+            offset += cmd['cmdsize']
 
     def unpack(self, offset, spec):
         endianesse = '<' if self.little_endian else '>'
@@ -40,9 +81,9 @@ class _MachO64(_MachO):
     section = section_64
     LC_SEGMENT_cmd = LC_SEGMENT_64
     nlist = nlist_64
-    LOAD_COMMAND_FORMATS = {
-            LC_SEGMENT_64: segment_command_64,
-            LC_SYMTAB: symtab_command,
+    LOAD_COMMAND_CLASSES = {
+            LC_SEGMENT_64: SegmentCommand64,
+            LC_SYMTAB: SymtabCommand,
         }
 
 
@@ -52,9 +93,9 @@ class _MachO32(_MachO):
     section = section_32
     LC_SEGMENT_cmd = LC_SEGMENT
     nlist = nlist_32
-    LOAD_COMMAND_FORMATS = {
-            LC_SEGMENT: segment_command_32,
-            LC_SYMTAB: symtab_command,
+    LOAD_COMMAND_CLASSES = {
+            LC_SEGMENT: SegmentCommand32,
+            LC_SYMTAB: SymtabCommand,
         }
 
 
