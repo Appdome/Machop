@@ -81,10 +81,14 @@ def load_fat(filename, little_endian=True):
             magic = struct.unpack('<I', f.read(4))[0]
             f.seek(offset)
 
-            if magic in [MH_MAGIC, MH_CIGAM]:
-                thins[arch_name] = _MachO32(filename, little_endian, arch)
-            elif magic in [MH_MAGIC_64, MH_CIGAM_64]:
-                thins[arch_name] = _MachO64(filename, little_endian, arch)
+            if magic == MH_MAGIC:
+                thins[arch_name] = _MachO32(filename, True, arch)
+            elif magic == MH_CIGAM:
+                thins[arch_name] = _MachO32(filename, False, arch)
+            if magic == MH_MAGIC_64:
+                thins[arch_name] = _MachO64(filename, True, arch)
+            elif magic == MH_CIGAM_64:
+                thins[arch_name] = _MachO64(filename, False, arch)
             else:
                 thins[arch_name] = None
         return thins
