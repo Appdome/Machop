@@ -63,7 +63,7 @@ class _MachO(object):
 
     def load_commands(self):
         offset = sizeof(self.mach_header)
-        for i in range(self.header['ncmds']):
+        for _ in range(self.header['ncmds']):
             cmd = self.unpack(offset, load_command)
             cmd_class = self.LOAD_COMMAND_CLASSES.get(cmd['cmd'], LoadCommand)
             yield cmd_class(self, offset)
@@ -114,7 +114,7 @@ def load_fat(filename, little_endian=True):
         header_bytes = f.read(sizeof(fat_header))
         header = unpack_from(header_bytes, 0, fat_header, little_endian)
         thins = {}
-        for i in range(header['nfat_arch']):
+        for _ in range(header['nfat_arch']):
             arch_bytes = f.read(sizeof(fat_arch))
             arch = unpack_from(arch_bytes, 0, fat_arch, little_endian)
             arch_name = get_arch_name(arch['cputype'], arch['cpusubtype'])
