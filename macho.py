@@ -1,47 +1,20 @@
 import struct
 
 from constants import *
+from structures import *
 from cputype import get_arch_name
 
 
-def unpack_from(raw, offset, spec, little_endian=True):
-    endianesse = '<' if little_endian else '>'
-    names, types = zip(*spec)
-    fmt = endianesse + ''.join(types)
-    values = struct.unpack_from(fmt, raw, offset)
-    return dict(zip(names, values))
-
-
-def sizeof(spec):
-    names, types = zip(*spec)
-    fmt = ''.join(types)
-    return struct.calcsize(fmt)
-
-uint8_t = 'B'
-int16_t = 'h'
-int32_t = 'i'
-uint32_t = 'I'
-uint64_t = 'Q'
-cpu_type_t = int32_t
-cpu_subtype_t = int32_t
-vm_prot_t = int32_t
-
-fat_header = [
-        ('magic', uint32_t),
-        ('nfat_arch', uint32_t),
-        ]
-
-fat_arch = [
-        ('cputype', uint32_t),
-        ('cpusubtype', uint32_t),
-        ('offset', uint32_t),
-        ('size', uint32_t),
-        ('align', uint32_t),
-        ]
-
-
 class _MachO(object):
+    mach_header = None
+    segment_command = None
+    section = None
+    LC_SEGMENT_cmd = None
+    nlist = None
+    LOAD_COMMAND_FORMATS = {}
+
     def __init__(self, filename, little_endian=True, arch=None):
+        self.little_endian = little_endian
         with open(filename, 'rb') as macho_file:
             if arch is None:
                 # Read all the file
@@ -50,10 +23,47 @@ class _MachO(object):
                 # Read just the part specified by the `arch` parameter
                 macho_file.seek(arch['offset'])
                 self.raw = macho_file.read(arch['size'])
+        self.header = self.unpack(0, self.mach_header)
+        print self.header
+
+    def unpack(self, offset, spec):
+        endianesse = '<' if self.little_endian else '>'
+        names, types = zip(*spec)
+        fmt = endianesse + ''.join(types)
+        values = struct.unpack_from(fmt, self.raw, offset)
+        return dict(zip(names, values))
 
 
-def load_thin(filename, little_endian=True):
-    return _MachO(filename, little_endian)
+class _MachO64(_MachO):
+    mach_header = mach_header_64
+    segment_command = segment_command_64
+    section = section_64
+    LC_SEGMENT_cmd = LC_SEGMENT_64
+    nlist = nlist_64
+    LOAD_COMMAND_FORMATS = {
+            LC_SEGMENT_64: segment_command_64,
+            LC_SYMTAB: symtab_command,
+        }
+
+
+class _MachO32(_MachO):
+    mach_header = mach_header_32
+    segment_command = segment_command_32
+    section = section_32
+    LC_SEGMENT_cmd = LC_SEGMENT
+    nlist = nlist_32
+    LOAD_COMMAND_FORMATS = {
+            LC_SEGMENT: segment_command_32,
+            LC_SYMTAB: symtab_command,
+        }
+
+
+def load_thin_32(filename, little_endian=True):
+    return _MachO32(filename, little_endian)
+
+
+def load_thin_64(filename, little_endian=True):
+    return _MachO64(filename, little_endian)
 
 
 def load_fat(filename, little_endian=True):
@@ -65,7 +75,18 @@ def load_fat(filename, little_endian=True):
             arch_bytes = f.read(sizeof(fat_arch))
             arch = unpack_from(arch_bytes, 0, fat_arch, little_endian)
             arch_name = get_arch_name(arch['cputype'], arch['cpusubtype'])
-            thins[arch_name] = _MachO(filename, little_endian, arch)
+
+            offset = f.tell()
+            f.seek(arch['offset'])
+            magic = struct.unpack('<I', f.read(4))[0]
+            f.seek(offset)
+
+            if magic in [MH_MAGIC, MH_CIGAM]:
+                thins[arch_name] = _MachO32(filename, little_endian, arch)
+            elif magic in [MH_MAGIC_64, MH_CIGAM_64]:
+                thins[arch_name] = _MachO64(filename, little_endian, arch)
+            else:
+                thins[arch_name] = None
         return thins
 
 
@@ -85,10 +106,10 @@ def MachO(filename):
     MACH_PARSERS = {
             FAT_MAGIC: lambda filename: load_fat(filename, True),
             FAT_CIGAM: lambda filename: load_fat(filename, False),
-            MH_MAGIC: lambda filename: load_thin(filename, True),
-            MH_CIGAM: lambda filename: load_thin(filename, False),
-            MH_MAGIC_64: lambda filename: load_thin(filename, True),
-            MH_CIGAM_64: lambda filename: load_thin(filename, False),
+            MH_MAGIC: lambda filename: load_thin_32(filename, True),
+            MH_CIGAM: lambda filename: load_thin_32(filename, False),
+            MH_MAGIC_64: lambda filename: load_thin_64(filename, True),
+            MH_CIGAM_64: lambda filename: load_thin_64(filename, False),
             }
     return MACH_PARSERS.get(read_magic(filename), load_non_mach)(filename)
 
