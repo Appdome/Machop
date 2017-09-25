@@ -2,12 +2,14 @@ import struct
 
 from cputype import get_arch_name
 
+
 def unpack_from(raw, offset, spec, little_endian=True):
     endianesse = '<' if little_endian else '>'
     names, types = zip(*spec)
     fmt = endianesse + ''.join(types)
     values = struct.unpack_from(fmt, raw, offset)
     return dict(zip(names, values))
+
 
 def sizeof(spec):
     names, types = zip(*spec)
@@ -36,6 +38,7 @@ fat_arch = [
         ('align', uint32_t),
         ]
 
+
 class _MachO(object):
     def __init__(self, filename, little_endian=True, arch=None):
         with open(filename, 'rb') as macho_file:
@@ -47,8 +50,10 @@ class _MachO(object):
                 macho_file.seek(arch['offset'])
                 self.raw = macho_file.read(arch['size'])
 
+
 def load_thin(filename, little_endian=True):
     return _MachO(filename, little_endian)
+
 
 def load_fat(filename, little_endian=True):
     with open(filename, 'rb') as f:
@@ -63,11 +68,12 @@ def load_fat(filename, little_endian=True):
         return thins
 
 PARSERS = {
-        'bebafeca': lambda filename: load_fat(filename, True), # FAT_CIGAM
-        'cafebabe': lambda filename: load_fat(filename, False), # FAT_MAGIC
-        'cdfaedfe': lambda filename: load_thin(filename, True), # MH_CIGAM
-        'feedface': lambda filename: load_thin(filename, False), # MH_MAGIC
+        'bebafeca': lambda filename: load_fat(filename, True),  # FAT_CIGAM
+        'cafebabe': lambda filename: load_fat(filename, False),  # FAT_MAGIC
+        'cdfaedfe': lambda filename: load_thin(filename, True),  # MH_CIGAM
+        'feedface': lambda filename: load_thin(filename, False),  # MH_MAGIC
         }
+
 
 def MachO(filename):
     with open(filename, 'rb') as f:
