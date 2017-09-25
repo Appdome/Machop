@@ -128,7 +128,7 @@ def load_fat(filename, little_endian=True):
                 thins[arch_name] = _MachO32(filename, True, arch)
             elif magic == MH_CIGAM:
                 thins[arch_name] = _MachO32(filename, False, arch)
-            if magic == MH_MAGIC_64:
+            elif magic == MH_MAGIC_64:
                 thins[arch_name] = _MachO64(filename, True, arch)
             elif magic == MH_CIGAM_64:
                 thins[arch_name] = _MachO64(filename, False, arch)
