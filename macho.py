@@ -18,6 +18,7 @@ class LoadCommand(object):
     def __str__(self):
         return 'LoadCommand(cmd={}, cmdsize={})'.format(self.cmd, self.cmdsize)
 
+
 class SegmentCommand(LoadCommand):
     def __str__(self):
         return 'Segment:{}'.format(self.segname.strip('\x00'))
@@ -33,6 +34,7 @@ class SegmentCommand64(SegmentCommand):
 
 class SymtabCommand(LoadCommand):
     CMD = symtab_command
+
     def __str__(self):
         return 'Symtab(nsyms={})'.format(self.nsyms)
 
