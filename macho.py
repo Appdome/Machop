@@ -58,8 +58,6 @@ class _MachO(object):
                 macho_file.seek(arch['offset'])
                 self.raw = macho_file.read(arch['size'])
         self.header = self.unpack(0, self.mach_header)
-        for xxx in self.load_commands():
-            print xxx
 
     def load_commands(self):
         offset = sizeof(self.mach_header)
