@@ -28,6 +28,10 @@ class Section(object):
     def __getattr__(self, attr):
         return self.section.get(attr, None)
 
+    @property
+    def name(self):
+        return self.sectname.strip('\x00')
+
 
 class SegmentCommand(LoadCommand):
     SECTION_CMD = None
@@ -41,6 +45,10 @@ class SegmentCommand(LoadCommand):
 
     def __str__(self):
         return 'Segment:{}'.format(self.segname.strip('\x00'))
+
+    @property
+    def name(self):
+        return self.segname.strip('\x00')
 
 
 class SegmentCommand32(SegmentCommand):
