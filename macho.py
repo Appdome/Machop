@@ -21,7 +21,8 @@ class LoadCommand(object):
 
 
 class Section(object):
-    def __init__(self, section):
+    def __init__(self, segment, section):
+        self.segment = segment
         self.section = section
 
     def __getattr__(self, attr):
@@ -30,10 +31,13 @@ class Section(object):
 
 class SegmentCommand(LoadCommand):
     SECTION_CMD = None
+
     def __iter__(self):
-        offset = self.offset
+        offset = self.offset + sizeof(self.CMD)
         for _ in range(self.nsects):
-            yield self.macho.unpack(offset, self.SECTION_COMMAND)
+            section = self.macho.unpack(offset, self.SECTION_COMMAND)
+            yield Section(self, section)
+            offset += sizeof(self.SECTION_COMMAND)
 
     def __str__(self):
         return 'Segment:{}'.format(self.segname.strip('\x00'))
@@ -54,12 +58,13 @@ class Symbol(object):
         self.symtab = symtab
         self.nlist = nlist
         self.idx = idx
-    
+
     def __str__(self):
         return self.symtab.extract_name(self.n_strx)
 
     def __getattr__(self, attr):
         return self.nlist.get(attr, None)
+
 
 class SymtabCommand(LoadCommand):
     CMD = symtab_command
@@ -198,6 +203,10 @@ def read_magic(filename):
         if len(magic) == 4:
             return struct.unpack('<I', magic)[0]
     return None
+
+
+def is_fat(filename):
+    return read_magic(filename) in [FAT_CIGAM, FAT_MAGIC]
 
 
 def MachO(filename):
