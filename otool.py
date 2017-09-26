@@ -4,12 +4,14 @@ from argparse import ArgumentParser
 import macho
 import constants
 
+
 def fat_thin_functor(filename, function):
     if macho.is_fat(filename):
         for _, mach in macho.MachO(filename).iteritems():
             function(mach)
     else:
         function(macho.MachO(filename))
+
 
 LC_NAMES = {lc for lc in dir(constants) if lc.startswith('LC_')}
 LC_NAMES_DICT = {getattr(constants, lc): lc for lc in LC_NAMES}
@@ -45,9 +47,9 @@ def iter_symbols(mach):
 
 
 def print_indirect_symbols(mach):
-    symbol_dict = {}
-    for k, v in groupby(iter_symbols(mach), lambda symbol: symbol.n_sect):
-        symbol_dict[k] = list(v)
+    symbol_dict = {section_index: list(symbol_list)
+                   for section_index, symbol_list
+                   in groupby(iter_symbols(mach), lambda sym: sym.n_sect)}
     for section_index, section in enumerate(iter_sections(mach)):
         print 'Indirect symbols for ({},{}) {} entries'.format(
             section.segment.name,
@@ -55,7 +57,8 @@ def print_indirect_symbols(mach):
             len(symbol_dict.get(section_index, [])))
         print 'address            index name'
         for symbol in symbol_dict.get(section_index, []):
-            print '0x{:016x} {:>5} {}'.format(symbol.n_value, symbol.idx, symbol)
+            print '0x{:016x} {:>5} {}'.format(
+                symbol.n_value, symbol.idx, symbol)
 
 if __name__ == '__main__':
     parser = ArgumentParser(add_help=False)
