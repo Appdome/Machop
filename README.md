@@ -1,2 +1,2 @@
 # *Machop*?
-Everybody's favorite [pokémon](https://bulbapedia.bulbagarden.net/wiki/Machop)
+Everybody's favorite [Pokémon](https://bulbapedia.bulbagarden.net/wiki/Machop)
