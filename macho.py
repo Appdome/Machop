@@ -5,6 +5,10 @@ from structures import *
 from cputype import get_arch_name
 
 
+def check_flag(flag, mask):
+    return (flag & mask) == mask
+
+
 class LoadCommand(object):
     CMD = load_command
 
@@ -74,6 +78,16 @@ class Symbol(object):
         return self.nlist.get(attr, None)
 
 
+class SpecialSymbol(Symbol):
+    def __init__(self, name):
+        self.n_value = 0
+        self.idx = 0
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+
 class SymtabCommand(LoadCommand):
     CMD = symtab_command
     NLIST = None
@@ -104,6 +118,28 @@ class SymtabCommand32(SymtabCommand):
 class SymtabCommand64(SymtabCommand):
     NLIST = nlist_64
 
+
+class DySymtabCommand(LoadCommand):
+    CMD = dysymtab_command
+
+    def __init__(self, macho, offset):
+        super(DySymtabCommand, self).__init__(macho, offset)
+        for cmd in macho.load_commands():
+            if cmd.cmd == LC_SYMTAB:
+                self.symbols_table = [sym for sym in cmd]
+                break
+
+    def __iter__(self):
+        offset = self.indirectsymoff
+        for idx in range(self.nindirectsyms):
+            index = self.macho.unpack(offset, table_index)['index']
+            if check_flag(index, INDIRECT_SYMBOL_ABS):
+                yield SpecialSymbol("ABSOLUTE")
+            elif check_flag(index, INDIRECT_SYMBOL_LOCAL):
+                yield SpecialSymbol("LOCAL")
+            else:
+                yield self.symbols_table[index]
+            offset += sizeof(table_index)
 
 class _MachO(object):
     mach_header = None
@@ -150,6 +186,7 @@ class _MachO64(_MachO):
     LOAD_COMMAND_CLASSES = {
         LC_SEGMENT_64: SegmentCommand64,
         LC_SYMTAB: SymtabCommand64,
+        LC_DYSYMTAB: DySymtabCommand,
     }
 
 
@@ -162,6 +199,7 @@ class _MachO32(_MachO):
     LOAD_COMMAND_CLASSES = {
         LC_SEGMENT: SegmentCommand32,
         LC_SYMTAB: SymtabCommand32,
+        LC_DYSYMTAB: DySymtabCommand,
     }
 
 
@@ -227,6 +265,7 @@ def MachO(filename):
         MH_CIGAM_64: lambda filename: load_thin_64(filename, False),
     }
     return MACH_PARSERS.get(read_magic(filename), load_non_mach)(filename)
+
 
 if __name__ == '__main__':
     from sys import argv

@@ -43,6 +43,33 @@ relocation_info = [
         ('r_info', uint32_t),
     ]
 
+dysymtab_command = [
+        ('cmd', uint32_t),
+        ('cmdsize', uint32_t),
+        ('ilocalsym', uint32_t),
+        ('nlocalsym', uint32_t),
+        ('iextdefsym', uint32_t),
+        ('nextdefsym', uint32_t),
+        ('iundefsym', uint32_t),
+        ('nundefsym', uint32_t),
+        ('tocoff', uint32_t),
+        ('ntoc', uint32_t),
+        ('modtaboff', uint32_t),
+        ('nmodtab', uint32_t),
+        ('extrefsymoff', uint32_t),
+        ('nextrefsyms', uint32_t),
+        ('indirectsymoff', uint32_t),
+        ('nindirectsyms', uint32_t),
+        ('extreloff', uint32_t),
+        ('nextrel', uint32_t),
+        ('locreloff', uint32_t),
+        ('nlocrel', uint32_t),
+    ]
+
+table_index = [
+        ('index', uint32_t),
+    ]
+
 # 32bit
 
 mach_header_32 = [

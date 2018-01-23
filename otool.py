@@ -46,12 +46,12 @@ def iter_symbols(mach):
             yield symbol
 
 
-def print_indirect_symbols(mach):
+def print_all_symbols(mach):
     symbol_dict = {section_index: list(symbol_list)
                    for section_index, symbol_list
                    in groupby(iter_symbols(mach), lambda sym: sym.n_sect)}
     for section_index, section in enumerate(iter_sections(mach)):
-        print 'Indirect symbols for ({},{}) {} entries'.format(
+        print 'Symbols for ({},{}) {} entries'.format(
             section.segment.name,
             section.name,
             len(symbol_dict.get(section_index, [])))
@@ -59,6 +59,40 @@ def print_indirect_symbols(mach):
         for symbol in symbol_dict.get(section_index, []):
             print '0x{:016x} {:>5} {}'.format(
                 symbol.n_value, symbol.idx, symbol)
+
+
+def get_dy_symbols(mach):
+    for cmd in mach.load_commands():
+        if cmd.cmd == constants.LC_DYSYMTAB:
+            return [symbol for symbol in cmd]
+
+
+def print_indirect_symbols(mach):
+    symbol_list = get_dy_symbols(mach)
+    is_64 = isinstance(mach, macho._MachO64)
+    symbol_address_size = 8 if is_64 else 4
+    for section_index, section in enumerate(iter_sections(mach)):
+        sec_flags = section.flags
+        if (sec_flags == constants.S_NON_LAZY_SYMBOL_POINTERS) \
+                or (sec_flags == constants.S_LAZY_SYMBOL_POINTERS):
+            number_of_symbols = section.size / symbol_address_size
+        elif sec_flags == constants.S_SYMBOL_STUBS:
+            number_of_symbols = section.size / section.reserved2
+        else:
+            continue
+        print 'Indirect symbols for ({},{}) {} entries'.format(
+            section.segment.name,
+            section.name,
+            number_of_symbols)
+        address = section.addr
+        print 'address            index name'
+        first_symbol = section.reserved1
+        for index in xrange(number_of_symbols):
+            symbol = symbol_list[first_symbol + index]
+            print '0x{:08x} {:>5} {}'.format(
+                address, symbol.idx, symbol)
+            address += symbol_address_size
+
 
 if __name__ == '__main__':
     parser = ArgumentParser(add_help=False)
@@ -72,11 +106,15 @@ if __name__ == '__main__':
                         help='print the mach header')
     parser.add_argument('-l', action='store_true',
                         help='print the load commands')
+    parser.add_argument('--all-symbols', action='store_true',
+                        help='print the entire symbol table')
     parser.add_argument('-I', action='store_true',
                         help='print the indirect symbol table')
     parser.add_argument('file')
     args = parser.parse_args()
     if args.l:
         fat_thin_functor(args.file, print_load_commands)
+    elif args.all_symbols:
+        fat_thin_functor(args.file, print_all_symbols)
     elif args.I:
         fat_thin_functor(args.file, print_indirect_symbols)
