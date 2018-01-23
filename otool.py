@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from itertools import groupby
 from argparse import ArgumentParser
 
