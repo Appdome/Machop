@@ -7,12 +7,12 @@ import macho
 import constants
 
 
-def fat_thin_functor(filename, function):
+def fat_thin_functor(filename, func):
     if macho.is_fat(filename):
         for _, mach in macho.MachO(filename).iteritems():
-            function(mach)
+            func(mach)
     else:
-        function(macho.MachO(filename))
+        func(macho.MachO(filename))
 
 
 LC_NAMES = {lc for lc in dir(constants) if lc.startswith('LC_')}
