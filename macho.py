@@ -186,13 +186,19 @@ class _MachO(object):
 
     def write_to_file(self, data, offset):
         """
-        :param data:
+        :param data: data to write
         :param offset: offset in current MachO arch
         :return:
         """
         with open(self.filename, "r+b") as macho_file:
             macho_file.seek(self.mach_offset + offset)
             macho_file.write(data)
+        self.raw = self.raw[:offset] + data + self.raw[offset + len(data):]
+
+    def update_file_part(self, value, spec, offset):
+        packed = self.pack(value, spec)
+        self.write_to_file(packed, offset)
+        return len(packed)
 
     def iter_sections(self):
         for cmd in self.load_commands():
@@ -209,15 +215,19 @@ class _MachO(object):
                 yield symbol
 
     def add_load_command(self, load_coammnd_to_insert):
-        self.can_add_command(load_coammnd_to_insert.cmdsize)
         load_commands = list(self.load_commands())
         offset = load_commands[-1].offset + load_commands[-1].cmdsize
-        packed = self.pack(load_coammnd_to_insert.lcmd, load_coammnd_to_insert.CMD)
-        self.write_to_file(packed, offset)
+        if not(self.can_add_command(load_coammnd_to_insert.cmdsize, offset)):
+            raise "Can't add command. Padding is too small"
+        added_data_len = self.update_file_part(load_coammnd_to_insert.lcmd, load_coammnd_to_insert.CMD, offset)
 
-    def can_add_command(self, command_size):
-        x = min([sec['offset'] for sec in self.iter_sections()])
-        y = x
+        self.header['ncmds'] += 1
+        self.header['sizeofcmds'] += added_data_len
+        self.update_file_part(self.header, self.mach_header, 0)
+
+    def can_add_command(self, command_size, command_start):
+        min_offset = min([sec.offset for sec in self.iter_sections()])
+        return (self.mach_offset + command_start + command_size) <= (min_offset + self.mach_offset)
 
 
 class _MachO64(_MachO):
