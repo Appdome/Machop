@@ -16,6 +16,7 @@ def fat_thin_functor(filename, func, args=None):
             mach.flush_changes_to_file()
     else:
         func(macho.MachO(filename), args)
+        mach.flush_changes_to_file()
 
 
 LC_NAMES = {lc for lc in dir(constants) if lc.startswith('LC_')}
@@ -82,10 +83,10 @@ def print_indirect_symbols(mach, args=None):
             address += symbol_address_size
 
 
-def add_load_command(mach, args):
+def add_load_command_load_dylib(mach, args):
     args = [int(i) for i in args[:-1]] + [args[-1]]
     dylib = macho.DylibCommand(mach, *args)
-    mach.add_load_command(dylib)
+    mach.add_load_command_load_dylib(dylib)
 
 
 if __name__ == '__main__':
@@ -104,7 +105,7 @@ if __name__ == '__main__':
                         help='print the entire symbol table')
     parser.add_argument('-I', action='store_true',
                         help='print the indirect symbol table')
-    parser.add_argument('--add-load-command', action='store', nargs=4,
+    parser.add_argument('--add-load-command-load-dylib', action='store', nargs=4,
                         help='add load command')
     parser.add_argument('file')
     args = parser.parse_args()
@@ -114,5 +115,5 @@ if __name__ == '__main__':
         fat_thin_functor(args.file, print_all_symbols)
     elif args.I:
         fat_thin_functor(args.file, print_indirect_symbols)
-    elif args.add_load_command:
-        fat_thin_functor(args.file, add_load_command, args.add_load_command)
+    elif args.add_load_command_load_dylib:
+        fat_thin_functor(args.file, add_load_command_load_dylib, args.add_load_command_load_dylib)

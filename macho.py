@@ -239,7 +239,7 @@ class _MachO(object):
             for symbol in cmd:
                 yield symbol
 
-    def add_load_command(self, load_coammnd_to_insert):
+    def add_load_command_load_dylib(self, load_coammnd_to_insert):
         load_commands = list(self.load_commands())
         offset = load_commands[-1].offset + load_commands[-1].cmdsize
         if not(self.can_add_command(load_coammnd_to_insert.cmdsize, offset)):
