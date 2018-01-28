@@ -209,20 +209,20 @@ class _MachO(object):
     def is_64(self):
         return isinstance(self, _MachO64)
 
-    def write_to_file(self, data, offset):
+    def flush_changes_to_file(self):
+        with open(self.filename, "r+b") as macho_file:
+            macho_file.seek(self.mach_offset)
+            macho_file.write(self.raw)
+
+    def update_file_part(self, value, spec, offset):
         """
+        updates file in memory ONLY
         :param data: data to write
         :param offset: offset in current MachO part
         :return:
         """
-        with open(self.filename, "r+b") as macho_file:
-            macho_file.seek(self.mach_offset + offset)
-            macho_file.write(data)
-        self.raw = self.raw[:offset] + data + self.raw[offset + len(data):]
-
-    def update_file_part(self, value, spec, offset):
         packed = self.pack(value, spec)
-        self.write_to_file(packed, offset)
+        self.raw = self.raw[:offset] + packed + self.raw[offset + len(packed):]
         return len(packed)
 
     def iter_sections(self):

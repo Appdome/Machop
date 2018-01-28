@@ -9,8 +9,11 @@ import constants
 
 def fat_thin_functor(filename, func, args=None):
     if macho.is_fat(filename):
-        for _, mach in macho.MachO(filename).iteritems():
+        machs = [mach for _, mach in macho.MachO(filename).iteritems()]
+        for mach in machs:
             func(mach, args)
+        for mach in machs:  # flush changed only if no exception occurred
+            mach.flush_changes_to_file()
     else:
         func(macho.MachO(filename), args)
 
