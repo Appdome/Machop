@@ -7,19 +7,19 @@ import macho
 import constants
 
 
-def fat_thin_functor(filename, func):
+def fat_thin_functor(filename, func, args=None):
     if macho.is_fat(filename):
         for _, mach in macho.MachO(filename).iteritems():
-            func(mach)
+            func(mach, args)
     else:
-        func(macho.MachO(filename))
+        func(macho.MachO(filename), args)
 
 
 LC_NAMES = {lc for lc in dir(constants) if lc.startswith('LC_')}
 LC_NAMES_DICT = {getattr(constants, lc): lc for lc in LC_NAMES}
 
 
-def print_load_commands(mach):
+def print_load_commands(mach, args=None):
     for i, cmd in enumerate(mach.load_commands()):
         print 'Load commnad {}'.format(i)
         print '      cmd {}'.format(LC_NAMES_DICT[cmd.cmd])
@@ -32,7 +32,7 @@ def print_load_commands(mach):
                 print '   segname {}'.format(cmd.name)
 
 
-def print_all_symbols(mach):
+def print_all_symbols(mach, args=None):
     symbol_dict = {section_index: list(symbol_list)
                    for section_index, symbol_list
                    in groupby(mach.iter_symbols(), lambda sym: sym.n_sect)}
@@ -50,13 +50,12 @@ def print_all_symbols(mach):
 def get_dy_symbols(mach):
     for cmd in mach.load_commands():
         if cmd.cmd == constants.LC_DYSYMTAB:
-            return [symbol for symbol in cmd] # TODO check if list(cmd) is the same
+            return list(cmd)
 
 
-def print_indirect_symbols(mach):
+def print_indirect_symbols(mach, args=None):
     symbol_list = get_dy_symbols(mach)
-    is_64 = isinstance(mach, macho._MachO64)
-    symbol_address_size = 8 if is_64 else 4
+    symbol_address_size = 8 if mach.is_64() else 4
     for section_index, section in enumerate(mach.iter_sections()):
         sec_flags = section.flags
         if (sec_flags == constants.S_NON_LAZY_SYMBOL_POINTERS) \
@@ -80,6 +79,12 @@ def print_indirect_symbols(mach):
             address += symbol_address_size
 
 
+def add_load_command(mach, args):
+    args = [int(i) for i in args[:-1]] + [args[-1]]
+    dylib = macho.DylibCommand(mach, *args)
+    mach.add_load_command(dylib)
+
+
 if __name__ == '__main__':
     parser = ArgumentParser(add_help=False)
     parser.add_argument('--help', action='help',
@@ -96,6 +101,8 @@ if __name__ == '__main__':
                         help='print the entire symbol table')
     parser.add_argument('-I', action='store_true',
                         help='print the indirect symbol table')
+    parser.add_argument('--add-load-command', action='store', nargs=4,
+                        help='add load command')
     parser.add_argument('file')
     args = parser.parse_args()
     if args.l:
@@ -104,3 +111,5 @@ if __name__ == '__main__':
         fat_thin_functor(args.file, print_all_symbols)
     elif args.I:
         fat_thin_functor(args.file, print_indirect_symbols)
+    elif args.add_load_command:
+        fat_thin_functor(args.file, add_load_command, args.add_load_command)

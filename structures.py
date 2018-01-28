@@ -70,6 +70,15 @@ table_index = [
         ('index', uint32_t),
     ]
 
+dylib_command = [
+        ('cmd', uint32_t),
+        ('cmdsize', uint32_t),
+        ('name_offset', uint32_t),  # original is a union of char* and uint32_t
+        ('timestamp', uint32_t),
+        ('current_version', uint32_t),
+        ('compatibility_version', uint32_t),
+]
+
 # 32bit
 
 mach_header_32 = [

@@ -5,6 +5,7 @@ from structures import *
 from cputype import get_arch_name
 from collections import OrderedDict
 
+
 def check_flag(flag, mask):
     return (flag & mask) == mask
 
@@ -12,10 +13,14 @@ def check_flag(flag, mask):
 class LoadCommand(object):
     CMD = load_command
 
-    def __init__(self, macho, offset):
+    def __init__(self, macho, offset=None, lcmd=None):
         self.macho = macho
-        self.lcmd = macho.unpack(offset, self.CMD)
         self.offset = offset
+
+        if offset is None:  # used in a self generated LoadCommand
+            self.lcmd = lcmd
+        else:
+            self.lcmd = macho.unpack(offset, self.CMD)
 
     def __getattr__(self, attr):
         return self.lcmd.get(attr, None)
@@ -35,6 +40,22 @@ class Section(object):
     @property
     def name(self):
         return self.sectname.strip('\x00')
+
+
+class DylibCommand(LoadCommand):
+    def __init__(self, macho, timestamp, version, comp_version, name):
+        gran = 8 if macho.is_64() else 4
+        name_len = len(name) + gran - (len(name) % gran)
+        self.CMD = dylib_command[:]
+        name_offset = sizeof(self.CMD)
+        cmdsize = name_offset + name_len
+        self.CMD += [('name', str(name_len) + 's')]
+        names, types = zip(*self.CMD)
+        generated_lcmd = OrderedDict(zip(names, [LC_LOAD_DYLIB,
+                                                 cmdsize, name_offset,
+                                                 timestamp, version,
+                                                 comp_version, name]))
+        super(DylibCommand, self).__init__(macho, None, generated_lcmd)
 
 
 class SegmentCommand(LoadCommand):
@@ -141,6 +162,7 @@ class DySymtabCommand(LoadCommand):
                 yield self.symbols_table[index]
             offset += sizeof(table_index)
 
+
 class _MachO(object):
     mach_header = None
     segment_command = None
@@ -184,10 +206,13 @@ class _MachO(object):
         fmt = endianesse + ''.join(types)
         return struct.pack(fmt, *values.values())
 
+    def is_64(self):
+        return isinstance(self, _MachO64)
+
     def write_to_file(self, data, offset):
         """
         :param data: data to write
-        :param offset: offset in current MachO arch
+        :param offset: offset in current MachO part
         :return:
         """
         with open(self.filename, "r+b") as macho_file:
@@ -218,16 +243,18 @@ class _MachO(object):
         load_commands = list(self.load_commands())
         offset = load_commands[-1].offset + load_commands[-1].cmdsize
         if not(self.can_add_command(load_coammnd_to_insert.cmdsize, offset)):
-            raise "Can't add command. Padding is too small"
-        added_data_len = self.update_file_part(load_coammnd_to_insert.lcmd, load_coammnd_to_insert.CMD, offset)
-
+            raise Exception("Can't add command. Padding is too small")
+        added_data_len = self.update_file_part(load_coammnd_to_insert.lcmd,
+                                               load_coammnd_to_insert.CMD,
+                                               offset)
         self.header['ncmds'] += 1
         self.header['sizeofcmds'] += added_data_len
         self.update_file_part(self.header, self.mach_header, 0)
 
     def can_add_command(self, command_size, command_start):
         min_offset = min([sec.offset for sec in self.iter_sections()])
-        return (self.mach_offset + command_start + command_size) <= (min_offset + self.mach_offset)
+        return (self.mach_offset + command_start + command_size) <= \
+               (min_offset + self.mach_offset)
 
 
 class _MachO64(_MachO):
