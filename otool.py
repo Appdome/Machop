@@ -32,27 +32,11 @@ def print_load_commands(mach):
                 print '   segname {}'.format(cmd.name)
 
 
-def iter_sections(mach):
-    for cmd in mach.load_commands():
-        if cmd.cmd not in [constants.LC_SEGMENT, constants.LC_SEGMENT_64]:
-            continue
-        for section in cmd:
-            yield section
-
-
-def iter_symbols(mach):
-    for cmd in mach.load_commands():
-        if cmd.cmd not in [constants.LC_SYMTAB]:
-            continue
-        for symbol in cmd:
-            yield symbol
-
-
 def print_all_symbols(mach):
     symbol_dict = {section_index: list(symbol_list)
                    for section_index, symbol_list
-                   in groupby(iter_symbols(mach), lambda sym: sym.n_sect)}
-    for section_index, section in enumerate(iter_sections(mach)):
+                   in groupby(mach.iter_symbols(), lambda sym: sym.n_sect)}
+    for section_index, section in enumerate(mach.iter_sections()):
         print 'Symbols for ({},{}) {} entries'.format(
             section.segment.name,
             section.name,
@@ -66,14 +50,14 @@ def print_all_symbols(mach):
 def get_dy_symbols(mach):
     for cmd in mach.load_commands():
         if cmd.cmd == constants.LC_DYSYMTAB:
-            return [symbol for symbol in cmd]
+            return [symbol for symbol in cmd] # TODO check if list(cmd) is the same
 
 
 def print_indirect_symbols(mach):
     symbol_list = get_dy_symbols(mach)
     is_64 = isinstance(mach, macho._MachO64)
     symbol_address_size = 8 if is_64 else 4
-    for section_index, section in enumerate(iter_sections(mach)):
+    for section_index, section in enumerate(mach.iter_sections()):
         sec_flags = section.flags
         if (sec_flags == constants.S_NON_LAZY_SYMBOL_POINTERS) \
                 or (sec_flags == constants.S_LAZY_SYMBOL_POINTERS):

@@ -3,7 +3,7 @@ import struct
 from constants import *
 from structures import *
 from cputype import get_arch_name
-
+from collections import OrderedDict
 
 def check_flag(flag, mask):
     return (flag & mask) == mask
@@ -38,7 +38,7 @@ class Section(object):
 
 
 class SegmentCommand(LoadCommand):
-    SECTION_CMD = None
+    SECTION_COMMAND = None
 
     def __iter__(self):
         offset = self.offset + sizeof(self.CMD)
@@ -151,6 +151,7 @@ class _MachO(object):
 
     def __init__(self, filename, little_endian=True, arch=None):
         self.little_endian = little_endian
+        self.filename = filename
         with open(filename, 'rb') as macho_file:
             if arch is None:
                 # Read all the file
@@ -158,6 +159,7 @@ class _MachO(object):
             else:
                 # Read just the part specified by the `arch` parameter
                 macho_file.seek(arch['offset'])
+                self.mach_offset = arch['offset']
                 self.raw = macho_file.read(arch['size'])
         self.header = self.unpack(0, self.mach_header)
 
@@ -174,7 +176,48 @@ class _MachO(object):
         names, types = zip(*spec)
         fmt = endianesse + ''.join(types)
         values = struct.unpack_from(fmt, self.raw, offset)
-        return dict(zip(names, values))
+        return OrderedDict(zip(names, values))
+
+    def pack(self, values, spec):
+        endianesse = '<' if self.little_endian else '>'
+        names, types = zip(*spec)
+        fmt = endianesse + ''.join(types)
+        return struct.pack(fmt, *values.values())
+
+    def write_to_file(self, data, offset):
+        """
+        :param data:
+        :param offset: offset in current MachO arch
+        :return:
+        """
+        with open(self.filename, "r+b") as macho_file:
+            macho_file.seek(self.mach_offset + offset)
+            macho_file.write(data)
+
+    def iter_sections(self):
+        for cmd in self.load_commands():
+            if cmd.cmd not in [LC_SEGMENT, LC_SEGMENT_64]:
+                continue
+            for section in cmd:
+                yield section
+
+    def iter_symbols(self):
+        for cmd in self.load_commands():
+            if cmd.cmd not in [LC_SYMTAB]:
+                continue
+            for symbol in cmd:
+                yield symbol
+
+    def add_load_command(self, load_coammnd_to_insert):
+        self.can_add_command(load_coammnd_to_insert.cmdsize)
+        load_commands = list(self.load_commands())
+        offset = load_commands[-1].offset + load_commands[-1].cmdsize
+        packed = self.pack(load_coammnd_to_insert.lcmd, load_coammnd_to_insert.CMD)
+        self.write_to_file(packed, offset)
+
+    def can_add_command(self, command_size):
+        x = min([sec['offset'] for sec in self.iter_sections()])
+        y = x
 
 
 class _MachO64(_MachO):
