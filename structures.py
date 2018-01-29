@@ -186,6 +186,11 @@ def unpack_from(raw, offset, spec, little_endian=True):
     return dict(zip(names, values))
 
 
+def pack_dict(dict, spec):
+    struct_spec = "".join(map(lambda x: x[1], spec))
+    return struct.pack(struct_spec, *dict.values())
+
+
 def sizeof(spec):
     names, types = zip(*spec)
     fmt = ''.join(types)

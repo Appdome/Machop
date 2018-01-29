@@ -6,16 +6,20 @@ from itertools import groupby
 from argparse import ArgumentParser
 
 
-def fat_thin_functor(filename, func, args=None):
-    if macho.is_fat(filename):
-        machs = [mach for _, mach in macho.MachO(filename).iteritems()]
-        for mach in machs:
-            func(mach, args)
-        for mach in machs:  # flush changed only if no exception occurred
-            mach.flush_changes_to_file()
+def fat_thin_get_macho_list(file_path):
+    if macho.is_fat(file_path):
+        machos = [mach for _, mach in macho.MachO(file_path).iteritems()]
     else:
-        func(macho.MachO(filename), args)
-        mach.flush_changes_to_file()
+        machos = [macho.MachO(file_path)]
+
+    return machos
+
+
+def fat_thin_functor(file_path, func, args=None):
+    machos = fat_thin_get_macho_list(file_path)
+    for current_macho in machos:
+        func(current_macho, args)
+        current_macho.flush_changes_to_file()
 
 
 LC_NAMES = {lc for lc in dir(constants) if lc.startswith('LC_')}
@@ -88,6 +92,12 @@ def add_load_command_load_dylib(mach, args):
     mach.add_load_command_load_dylib(dylib)
 
 
+def remove_load_command(file_path, macho_index, command_index):
+    machos = fat_thin_get_macho_list(file_path)
+    machos[macho_index].remove_load_command(command_index)
+    machos[macho_index].flush_changes_to_file()
+
+
 if __name__ == '__main__':
     parser = ArgumentParser(add_help=False)
     parser.add_argument('--help', action='help', help='Show this help message and exit')
@@ -98,12 +108,15 @@ if __name__ == '__main__':
     parser.add_argument('--all-symbols', action='store_true', help='Print the entire symbol table')
     parser.add_argument('-i', action='store_true', help='Print the indirect symbol table')
     parser.add_argument('--add-load-command-load-dylib', action='store', nargs=4, help='Add load command')
-    parser.add_argument('--remove-load-command', action='store',
+    parser.add_argument('--remove-load-command', action='store', nargs=2,
                         help='Remove load command at given index from specified MachO',
                         metavar='MACHO_INDEX COMM_INDEX')
     parser.add_argument('file')
     args = parser.parse_args()
 
+    if args.remove_load_command:
+        remove_load_command(args.file, int(args.remove_load_command[0]), int(args.remove_load_command[1]))
+        exit(0)
     if args.l:
         fat_thin_functor(args.file, print_load_commands)
     elif args.all_symbols:
