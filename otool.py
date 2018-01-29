@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
-from itertools import groupby
-from argparse import ArgumentParser
-
 import macho
 import constants
+from itertools import groupby
+from argparse import ArgumentParser
 
 
 def fat_thin_functor(filename, func, args=None):
@@ -91,29 +90,28 @@ def add_load_command_load_dylib(mach, args):
 
 if __name__ == '__main__':
     parser = ArgumentParser(add_help=False)
-    parser.add_argument('--help', action='help',
-                        help='show this help message and exit')
-    parser.add_argument('-f', action='store_true',
-                        help='print the fat headers')
-    parser.add_argument('-a', action='store_true',
-                        help='print the archive header')
-    parser.add_argument('-h', action='store_true',
-                        help='print the mach header')
-    parser.add_argument('-l', action='store_true',
-                        help='print the load commands')
-    parser.add_argument('--all-symbols', action='store_true',
-                        help='print the entire symbol table')
-    parser.add_argument('-I', action='store_true',
-                        help='print the indirect symbol table')
-    parser.add_argument('--add-load-command-load-dylib', action='store', nargs=4,
-                        help='add load command')
+    parser.add_argument('--help', action='help', help='Show this help message and exit')
+    parser.add_argument('-f', action='store_true', help='Print the fat headers')
+    parser.add_argument('-a', action='store_true', help='Print the archive header')
+    parser.add_argument('-h', action='store_true', help='Print the mach header')
+    parser.add_argument('-l', action='store_true', help='Print the load commands')
+    parser.add_argument('--all-symbols', action='store_true', help='Print the entire symbol table')
+    parser.add_argument('-i', action='store_true', help='Print the indirect symbol table')
+    parser.add_argument('--add-load-command-load-dylib', action='store', nargs=4, help='Add load command')
+    parser.add_argument('--remove-load-command', action='store',
+                        help='Remove load command at given index from specified MachO',
+                        metavar='MACHO_INDEX COMM_INDEX')
     parser.add_argument('file')
     args = parser.parse_args()
+
     if args.l:
         fat_thin_functor(args.file, print_load_commands)
     elif args.all_symbols:
         fat_thin_functor(args.file, print_all_symbols)
-    elif args.I:
+    elif args.i:
         fat_thin_functor(args.file, print_indirect_symbols)
     elif args.add_load_command_load_dylib:
         fat_thin_functor(args.file, add_load_command_load_dylib, args.add_load_command_load_dylib)
+    else:
+        parser.error("At least one option is required ")
+
