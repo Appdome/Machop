@@ -19,6 +19,8 @@ def fat_thin_functor(file_path, func, args=None):
     machos = fat_thin_get_macho_list(file_path)
     for current_macho in machos:
         func(current_macho, args)
+    # flush changed only if no exception occurred
+    for current_macho in machos:
         current_macho.flush_changes_to_file()
 
 
