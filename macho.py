@@ -197,6 +197,7 @@ class _MachO(object):
         with open(filename, 'rb') as macho_file:
             if arch is None:
                 # Read all the file
+                self.mach_offset = 0
                 self.raw = macho_file.read()
                 self.mach_offset = 0
             else:
@@ -278,6 +279,28 @@ class _MachO(object):
         self.header['ncmds'] += 1
         self.header['sizeofcmds'] += added_data_len
         self.update_file_part(self.header, self.mach_header, 0)
+
+    def remove_load_command(self, command_index):
+        load_commands = list(self.load_commands())
+        target_command_size = load_commands[command_index].lcmd["cmdsize"]
+
+        #Delete the load command
+        delete_range_start = load_commands[command_index].offset
+        delete_range_end = delete_range_start + target_command_size
+
+        self.raw = "".join((self.raw[0:delete_range_start], self.raw[delete_range_end:-1]))
+
+        #Add zeroes at the end of load commands section
+        filler_start = load_commands[-1].offset + load_commands[-1].lcmd["cmdsize"] - target_command_size
+        self.raw = "".join((self.raw[0:filler_start], "\x00" * target_command_size, self.raw[filler_start:-1]))
+
+        #Update number of commands and load section size
+        self.header["ncmds"] = self.header["ncmds"] - 1
+        self.header["sizeofcmds"] = self.header["sizeofcmds"] - target_command_size
+        new_macho_header = pack_dict(self.header, self.mach_header)
+        # TODO - use update_file_part func
+        self.raw = "".join((new_macho_header, self.raw[len(new_macho_header):]))
+        self.file_changed = True
 
     def can_add_command(self, command_size, command_start):
         min_offset = min([sec.offset for sec in self.iter_sections() if not sec.flags == S_ZEROFILL])
