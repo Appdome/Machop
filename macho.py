@@ -59,6 +59,9 @@ class DylibCommand(LoadCommand):
         return name_string[:end]
 
 def createDylibCommand(macho, timestamp, version, comp_version, name):
+    # CR: Are you aligning the name length to the platform's word size?
+    # If so, use "word_size", not "gran", and the "name_len"
+    # calculation should be with an "align" function
     gran = 8 if macho.is_64() else 4
     name_len = len(name) + gran - (len(name) % gran)
     tempDylib = DylibCommand()
@@ -73,7 +76,6 @@ def createDylibCommand(macho, timestamp, version, comp_version, name):
                                              comp_version, name]))
     tempDylib.__init__(macho, None, generated_lcmd)
     return tempDylib
-
 
 
 class SegmentCommand(LoadCommand):
@@ -226,6 +228,9 @@ class _MachO(object):
         fmt = endianesse + ''.join(types)
         return struct.pack(fmt, *values.values())
 
+    # CR: Could it be better to define a static field for each MachO class:
+    # "word" and maybe even a "word_size" and then you don't need the dirty
+    # "isinstance" hack.
     def is_64(self):
         return isinstance(self, _MachO64)
 
@@ -236,6 +241,7 @@ class _MachO(object):
                 macho_file.write(self.raw)
 
     def update_file_part(self, value, spec, offset):
+        # CR: The docstring does not fit the function's parameter names
         """
         updates file in memory ONLY
         :param data: data to write
@@ -264,7 +270,7 @@ class _MachO(object):
     def add_load_command_load_dylib(self, load_coammnd_to_insert):
         load_commands = list(self.load_commands())
         offset = load_commands[-1].offset + load_commands[-1].cmdsize
-        if not(self.can_add_command(load_coammnd_to_insert.cmdsize, offset)):
+        if not self.can_add_command(load_coammnd_to_insert.cmdsize, offset):
             raise Exception("Can't add command. Padding is too small")
         added_data_len = self.update_file_part(load_coammnd_to_insert.lcmd,
                                                load_coammnd_to_insert.CMD,

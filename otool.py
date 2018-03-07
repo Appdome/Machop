@@ -108,6 +108,8 @@ if __name__ == '__main__':
                         help='print the entire symbol table')
     parser.add_argument('-I', action='store_true',
                         help='print the indirect symbol table')
+    # CR: This is not an "otool" command. Might want to put that in a different
+    # file
     parser.add_argument('--add-load-command-load-dylib', action='store', nargs=4,
                         help='add load command', metavar=('timestamp', 'current-version',
                                                           'compatibility-version', 'library-name'))
