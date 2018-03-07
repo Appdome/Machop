@@ -43,19 +43,37 @@ class Section(object):
 
 
 class DylibCommand(LoadCommand):
-    def __init__(self, macho, timestamp, version, comp_version, name):
-        gran = 8 if macho.is_64() else 4
-        name_len = len(name) + gran - (len(name) % gran)
-        self.CMD = dylib_command[:]
-        name_offset = sizeof(self.CMD)
-        cmdsize = name_offset + name_len
-        self.CMD += [('name', str(name_len) + 's')]
-        names, types = zip(*self.CMD)
-        generated_lcmd = OrderedDict(zip(names, [LC_LOAD_DYLIB,
-                                                 cmdsize, name_offset,
-                                                 timestamp, version,
-                                                 comp_version, name]))
-        super(DylibCommand, self).__init__(macho, None, generated_lcmd)
+    CMD = dylib_command
+
+    def __init__(self, macho=None, offset=None, lcmd=None):
+        if macho is None:
+            pass
+        else:
+            return super(DylibCommand, self).__init__(macho, offset, lcmd)
+
+
+    @property
+    def name(self):
+        name_string = self.macho.raw[self.offset + self.name_offset:]
+        end = name_string.find("\x00")
+        return name_string[:end]
+
+def createDylibCommand(macho, timestamp, version, comp_version, name):
+    gran = 8 if macho.is_64() else 4
+    name_len = len(name) + gran - (len(name) % gran)
+    tempDylib = DylibCommand()
+    tempDylib.CMD = dylib_command[:]
+    name_offset = sizeof(tempDylib.CMD)
+    cmdsize = name_offset + name_len
+    tempDylib.CMD += [('name', str(name_len) + 's')]
+    names, types = zip(*tempDylib.CMD)
+    generated_lcmd = OrderedDict(zip(names, [LC_LOAD_DYLIB,
+                                             cmdsize, name_offset,
+                                             timestamp, version,
+                                             comp_version, name]))
+    tempDylib.__init__(macho, None, generated_lcmd)
+    return tempDylib
+
 
 
 class SegmentCommand(LoadCommand):
@@ -178,12 +196,14 @@ class _MachO(object):
             if arch is None:
                 # Read all the file
                 self.raw = macho_file.read()
+                self.mach_offset = 0
             else:
                 # Read just the part specified by the `arch` parameter
                 macho_file.seek(arch['offset'])
                 self.mach_offset = arch['offset']
                 self.raw = macho_file.read(arch['size'])
         self.header = self.unpack(0, self.mach_header)
+        self.file_changed = False
 
     def load_commands(self):
         offset = sizeof(self.mach_header)
@@ -210,9 +230,10 @@ class _MachO(object):
         return isinstance(self, _MachO64)
 
     def flush_changes_to_file(self):
-        with open(self.filename, "r+b") as macho_file:
-            macho_file.seek(self.mach_offset)
-            macho_file.write(self.raw)
+        if self.file_changed:
+            with open(self.filename, "r+b") as macho_file:
+                macho_file.seek(self.mach_offset)
+                macho_file.write(self.raw)
 
     def update_file_part(self, value, spec, offset):
         """
@@ -223,6 +244,7 @@ class _MachO(object):
         """
         packed = self.pack(value, spec)
         self.raw = self.raw[:offset] + packed + self.raw[offset + len(packed):]
+        self.file_changed = True
         return len(packed)
 
     def iter_sections(self):
@@ -252,7 +274,7 @@ class _MachO(object):
         self.update_file_part(self.header, self.mach_header, 0)
 
     def can_add_command(self, command_size, command_start):
-        min_offset = min([sec.offset for sec in self.iter_sections()])
+        min_offset = min([sec.offset for sec in self.iter_sections() if not sec.flags == S_ZEROFILL])
         return (self.mach_offset + command_start + command_size) <= \
                (min_offset + self.mach_offset)
 
@@ -267,6 +289,7 @@ class _MachO64(_MachO):
         LC_SEGMENT_64: SegmentCommand64,
         LC_SYMTAB: SymtabCommand64,
         LC_DYSYMTAB: DySymtabCommand,
+        LC_LOAD_DYLIB: DylibCommand,
     }
 
 
@@ -280,6 +303,7 @@ class _MachO32(_MachO):
         LC_SEGMENT: SegmentCommand32,
         LC_SYMTAB: SymtabCommand32,
         LC_DYSYMTAB: DySymtabCommand,
+        LC_LOAD_DYLIB: DylibCommand,
     }
 
 

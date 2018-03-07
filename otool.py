@@ -15,7 +15,8 @@ def fat_thin_functor(filename, func, args=None):
         for mach in machs:  # flush changed only if no exception occurred
             mach.flush_changes_to_file()
     else:
-        func(macho.MachO(filename), args)
+        mach = macho.MachO(filename)
+        func(mach, args)
         mach.flush_changes_to_file()
 
 
@@ -34,6 +35,8 @@ def print_load_commands(mach, args=None):
                 print 'Section'
                 print '  sectname {}'.format(section.name)
                 print '   segname {}'.format(cmd.name)
+        if cmd.cmd == constants.LC_LOAD_DYLIB:
+            print '  name {}'.format(cmd.name)
 
 
 def print_all_symbols(mach, args=None):
@@ -85,7 +88,7 @@ def print_indirect_symbols(mach, args=None):
 
 def add_load_command_load_dylib(mach, args):
     args = [int(i) for i in args[:-1]] + [args[-1]]
-    dylib = macho.DylibCommand(mach, *args)
+    dylib = macho.createDylibCommand(mach, *args)
     mach.add_load_command_load_dylib(dylib)
 
 
@@ -106,7 +109,8 @@ if __name__ == '__main__':
     parser.add_argument('-I', action='store_true',
                         help='print the indirect symbol table')
     parser.add_argument('--add-load-command-load-dylib', action='store', nargs=4,
-                        help='add load command')
+                        help='add load command', metavar=('timestamp', 'current-version',
+                                                          'compatibility-version', 'library-name'))
     parser.add_argument('file')
     args = parser.parse_args()
     if args.l:
