@@ -161,20 +161,35 @@ class _MachO(object):
                 self.raw = macho_file.read(arch['size'])
         self.header = self.unpack(0, self.mach_header)
 
-    def load_commands(self):
+    def load_commands(self, types=None):
         offset = sizeof(self.mach_header)
         for _ in range(self.header['ncmds']):
             cmd = self.unpack(offset, load_command)
             cmd_class = self.LOAD_COMMAND_CLASSES.get(cmd['cmd'], LoadCommand)
-            yield cmd_class(self, offset)
+            if types is None or cmd['cmd'] in types:
+                yield cmd_class(self, offset)
             offset += cmd['cmdsize']
+
+    def load_command(self, type):
+        lcs = self.load_commands([type])        
+        try:
+            return lcs.next()
+        except:
+            return None
+
+    def get_section(self, segment_name, section_name):
+        for cmd in self.load_commands([LC_SEGMENT, LC_SEGMENT_64]):
+            for section in cmd:
+                if section.segment.name == segment_name and section.name == section_name:
+                    return section
+        return None            
 
     def unpack(self, offset, spec):
         endianesse = '<' if self.little_endian else '>'
         names, types = zip(*spec)
         fmt = endianesse + ''.join(types)
         values = struct.unpack_from(fmt, self.raw, offset)
-        return dict(zip(names, values))
+        return dict(zip(names, values))        
 
 
 class _MachO64(_MachO):

@@ -33,19 +33,14 @@ def print_load_commands(mach):
 
 
 def iter_sections(mach):
-    for cmd in mach.load_commands():
-        if cmd.cmd not in [constants.LC_SEGMENT, constants.LC_SEGMENT_64]:
-            continue
+    for cmd in mach.load_commands([constants.LC_SEGMENT, constants.LC_SEGMENT_64]):
         for section in cmd:
             yield section
 
 
 def iter_symbols(mach):
-    for cmd in mach.load_commands():
-        if cmd.cmd not in [constants.LC_SYMTAB]:
-            continue
-        for symbol in cmd:
-            yield symbol
+    for symbol in mach.load_command(constants.LC_SYMTAB):         
+        yield symbol
 
 
 def print_all_symbols(mach):
@@ -64,9 +59,8 @@ def print_all_symbols(mach):
 
 
 def get_dy_symbols(mach):
-    for cmd in mach.load_commands():
-        if cmd.cmd == constants.LC_DYSYMTAB:
-            return [symbol for symbol in cmd]
+    cmd = mach.load_command(constants.LC_DYSYMTAB)
+    return list(cmd)
 
 
 def print_indirect_symbols(mach):
