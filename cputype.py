@@ -320,6 +320,8 @@ def get_arch_name(cputype, cpusubtype):
                 output += ''
             if cpusubtype & 0xffffff == 1:
                 output += 'v8'
+            if cpusubtype & 0xffffff == 2:
+                output += 'e'
         if cputype & 0xffffff == 13:
             output += '64-bit architecture=%d' % (cputype & 0xffffff)
         if cputype & 0xffffff == 14:
